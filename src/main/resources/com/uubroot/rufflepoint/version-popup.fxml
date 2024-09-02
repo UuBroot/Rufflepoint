@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.DialogPane?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Text?>
@@ -27,28 +25,7 @@
             <VBox prefHeight="81.0" prefWidth="170.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
             <ScrollPane prefHeight="31.0" prefWidth="169.0" GridPane.rowIndex="1">
                <content>
-                  <VBox alignment="CENTER" prefHeight="0.0" prefWidth="100.0">
-                     <children>
-                        <HBox alignment="CENTER">
-                           <children>
-                              <Text strokeType="OUTSIDE" strokeWidth="0.0" text="1.0" />
-                              <Button mnemonicParsing="false" text="Install" />
-                           </children>
-                        </HBox>
-                        <HBox alignment="CENTER" layoutX="10.0" layoutY="13.0">
-                           <children>
-                              <Text strokeType="OUTSIDE" strokeWidth="0.0" text="1.0" />
-                              <Button mnemonicParsing="false" text="Install" />
-                           </children>
-                        </HBox>
-                        <HBox alignment="CENTER" layoutX="10.0" layoutY="35.0">
-                           <children>
-                              <Text strokeType="OUTSIDE" strokeWidth="0.0" text="1.0" />
-                              <Button mnemonicParsing="false" text="Install" />
-                           </children>
-                        </HBox>
-                     </children>
-                  </VBox>
+                  <VBox fx:id="availableVersions" alignment="CENTER" prefHeight="0.0" prefWidth="100.0" />
                </content>
             </ScrollPane>
          </children>

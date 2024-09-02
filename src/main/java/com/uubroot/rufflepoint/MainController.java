@@ -21,7 +21,15 @@ public class MainController {
     }
 
     private void downloadRuffleVersion(String version){
+        switch (System.getProperty("os.name")){
+            case "Linux":
+                String url = "https://github.com/ruffle-rs/ruffle/releases/download/"+version+"/"+version+"-linux-x86_64.tar.gz";
+                break;
+            default:
+                System.err.println(System.getProperty("os.name")+" not supported");
+                System.exit(1);
+
+        }
 
     }
-
 }
