@@ -1,14 +1,27 @@
 package com.uubroot.rufflepoint;
 
+import java.util.List;
+
 public class RuffleVersion {
     private String name;
-    private String fileNameLinux;
+    private List files;
     private String uploadDate;
 
-    public RuffleVersion(String name,String fileNameLinux,String uploadDate){
+    public RuffleVersion(String name,List files,String uploadDate){
         this.name = name;
-        this.fileNameLinux = fileNameLinux;
+        this.files = files;
         this.uploadDate = uploadDate;
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public List getFiles() {
+        return files;
+    }
+
+    public String getUploadDate() {
+        return uploadDate;
+    }
 }

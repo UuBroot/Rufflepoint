@@ -5,22 +5,34 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DialogPane;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.commons.io.IOUtils;
 
 public class RuffleVersionController {
     @FXML
@@ -29,19 +41,34 @@ public class RuffleVersionController {
     @FXML
     private VBox availableVersions;
 
+    @FXML
+    private ImageView spinner;
+
+    private List<String> downloadedVersions = new ArrayList<>();
+
     public void initialize() throws Exception {
         dialog.getButtonTypes().add(ButtonType.CLOSE);
 
-        List<String> versions = getVersions();
+        List<RuffleVersion> versions = getVersions();
 
-        versions.add("1.2");
+        spinner.setImage(new Image("https://media.tenor.com/wpSo-8CrXqUAAAAi/loading-loading-forever.gif"));//TODO:Replace with non online gif
+        spinner.setVisible(false);
+
         for (int i = 0; i < versions.size(); i++) {
             HBox newItem = new HBox();
             Text versionNumber = new Text();
             Button installButton = new Button();
 
-            versionNumber.setText(versions.get(i));
+            versionNumber.setText(versions.get(i).getName());
             installButton.setText("Install");
+            int thisI = i;//is done because intelij said so
+            installButton.setOnAction(actionEvent -> {
+                try {
+                    downloadVersion(versions.get(thisI).getFiles());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
             newItem.getChildren().add(versionNumber);
             newItem.getChildren().add(installButton);
@@ -51,7 +78,86 @@ public class RuffleVersionController {
 
     }
 
-    private List<String> getVersions() throws Exception {
+    private void downloadVersion(List files) throws IOException {
+        URL downloadLink = null;
+        String fileName = "";
+        spinner.setVisible(true);
+        switch (System.getProperty("os.name")){
+            case "Linux":
+                try{
+                    Gson gson = new Gson();
+                    downloadLink = new URL(gson.fromJson(files.get(1).toString(), JsonObject.class).get("browser_download_url").getAsString());
+                    System.out.println(downloadLink);
+
+                    fileName = gson.fromJson(files.get(1).toString(), JsonObject.class).get("name").getAsString();
+                } catch (Exception e) {
+                    spinner.setVisible(false);
+                    throw new RuntimeException(e);
+                }
+
+                break;
+            default:
+                System.err.println(System.getProperty("os.name")+" not supported");
+                System.exit(1);
+
+        }
+        spinner.setVisible(true);
+        String pathToFile = FolderManager.folderPath+"/"+fileName;
+        System.out.println(pathToFile);
+
+        HttpURLConnection connection = (HttpURLConnection) downloadLink.openConnection();
+        connection.setRequestMethod("GET");
+
+        try (InputStream inputStream = connection.getInputStream();
+             FileOutputStream fileOutputStream = new FileOutputStream(pathToFile)) {
+
+            byte[] buffer = new byte[1024];
+            int length;
+
+
+            while ((length = inputStream.read(buffer)) > 0) {
+                fileOutputStream.write(buffer, 0, length);
+
+            }
+
+        }
+
+        File downloadedFile = new File(pathToFile);
+        File outputDir = new File(FolderManager.folderPath+"/ruffle/"+fileName);
+        outputDir.mkdir();
+
+
+        try (InputStream fi = new FileInputStream(downloadedFile);
+             GzipCompressorInputStream gzi = new GzipCompressorInputStream(fi);
+             TarArchiveInputStream tai = new TarArchiveInputStream(gzi)) {
+
+            TarArchiveEntry entry;
+            while ((entry = tai.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    File dir = new File(outputDir, entry.getName());
+                    dir.mkdir();
+
+                } else {
+                    File file = new File(outputDir, entry.getName());
+                    try (OutputStream fo = new FileOutputStream(file)) {
+                        IOUtils.copy(tai, fo);
+
+                    }
+                }
+            }
+        }
+
+        try{
+            downloadedFile.delete();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        spinner.setVisible(false);
+    }
+
+
+    private List<RuffleVersion> getVersions() throws Exception {
         URL url = new URL("https://api.github.com/repos/ruffle-rs/ruffle/releases");
         BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
 
@@ -65,12 +171,11 @@ public class RuffleVersionController {
         String jsonString = jsonStringBuilder.toString();
 
         // Parse the JSON string
-        List<String> ids = parseJson(jsonString);
-        return ids;
+        return parseJson(jsonString);
     }
 
-    private List<String> parseJson(String jsonString) throws Exception {
-        List<String> list = new ArrayList<>();
+    private List<RuffleVersion> parseJson(String jsonString) throws Exception {
+        List<RuffleVersion> list = new ArrayList<>();
         JsonElement jsonElement = JsonParser.parseString(jsonString);
         if (jsonElement.isJsonArray()) {
             System.out.println(jsonElement);
@@ -81,7 +186,10 @@ public class RuffleVersionController {
             for (int i = 0;i < jsonArray.size();i++){
                 JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
                 System.out.println(jsonObject.get("tag_name"));
-                list.add(jsonObject.get("tag_name").getAsString());
+
+                RuffleVersion newVersion = new RuffleVersion(jsonObject.get("tag_name").getAsString(), jsonObject.get("assets").getAsJsonArray().asList(), jsonObject.get("published_at").getAsString());
+
+                list.add(newVersion);
                 System.out.println("--------------------------");
 
             }
