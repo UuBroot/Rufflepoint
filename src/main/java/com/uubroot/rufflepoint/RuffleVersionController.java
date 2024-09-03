@@ -2,10 +2,7 @@ package com.uubroot.rufflepoint;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.DialogPane;
-import javafx.scene.control.ProgressBar;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -18,10 +15,7 @@ import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.*;
@@ -42,18 +36,28 @@ public class RuffleVersionController {
     private VBox availableVersions;
 
     @FXML
+    private VBox downloadedVersions;
+
+    @FXML
     private ImageView spinner;
 
-    private List<String> downloadedVersions = new ArrayList<>();
+    private List<String> downloadedVersionsList = new ArrayList<>();
 
     public void initialize() throws Exception {
+        //adds button to close popup
         dialog.getButtonTypes().add(ButtonType.CLOSE);
 
-        List<RuffleVersion> versions = getVersions();
-
+        //Loads the loading spinner
         spinner.setImage(new Image("https://media.tenor.com/wpSo-8CrXqUAAAAi/loading-loading-forever.gif"));//TODO:Replace with non online gif
         spinner.setVisible(false);
 
+        //updates already downloaded versions
+        updateDownloadedEntries();
+
+        //Downloads json to show all downloadable ruffle versions
+        List<RuffleVersion> versions = getVersions();
+
+        //generates versions in gui
         for (int i = 0; i < versions.size(); i++) {
             HBox newItem = new HBox();
             Text versionNumber = new Text();
@@ -78,10 +82,65 @@ public class RuffleVersionController {
 
     }
 
+    private void updateDownloadedEntries(){
+        File ruffleFolder = new File(FolderManager.folderPath+"/ruffle");
+        List<File> folders = new ArrayList<>();
+
+        for (File file : Objects.requireNonNull(ruffleFolder.listFiles())) {
+            if (file.isDirectory()) {
+                folders.add(file);
+            }
+        }
+
+        downloadedVersionsList.clear();
+        downloadedVersions.getChildren().clear();
+        for (File folder : folders) {
+            downloadedVersionsList.add(folder.getName());
+
+            HBox newItem = new HBox();
+            Text versionNumber = new Text();
+            Button removeButton = new Button();
+
+            versionNumber.setText(folder.getName());
+            removeButton.setText("X");
+
+            removeButton.setOnAction(actionEvent -> {
+                try{
+                    removeVersion(folder);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            newItem.getChildren().add(removeButton);
+            newItem.getChildren().add(versionNumber);
+
+            downloadedVersions.getChildren().add(newItem);
+        }
+
+
+    }
+
+    private void removeVersion(File version) {
+        if(version.isDirectory()){
+            for(File file: Objects.requireNonNull(version.listFiles())){
+                if(file.isDirectory()){
+                    removeVersion(file);
+                }else{
+                    file.delete();
+                }
+            }
+
+        }
+        version.delete();
+        updateDownloadedEntries();
+    }
+
     private void downloadVersion(List files) throws IOException {
         URL downloadLink = null;
         String fileName = "";
         spinner.setVisible(true);
+
         switch (System.getProperty("os.name")){
             case "Linux":
                 try{
@@ -101,6 +160,19 @@ public class RuffleVersionController {
                 System.exit(1);
 
         }
+
+        //Checks if version already exists
+        System.out.println(fileName);
+        if(downloadedVersionsList.contains(fileName)){
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Ruffle version already downloaded");
+            alert.setHeaderText("Ruffle version already downloaded");
+            alert.setContentText("Please download a different one, or delete the current");
+            alert.showAndWait();
+
+            return;
+        }
+
         spinner.setVisible(true);
         String pathToFile = FolderManager.folderPath+"/"+fileName;
         System.out.println(pathToFile);
@@ -125,7 +197,6 @@ public class RuffleVersionController {
         File downloadedFile = new File(pathToFile);
         File outputDir = new File(FolderManager.folderPath+"/ruffle/"+fileName);
         outputDir.mkdir();
-
 
         try (InputStream fi = new FileInputStream(downloadedFile);
              GzipCompressorInputStream gzi = new GzipCompressorInputStream(fi);
@@ -153,7 +224,9 @@ public class RuffleVersionController {
             throw new RuntimeException(e);
         }
 
+        updateDownloadedEntries();
         spinner.setVisible(false);
+
     }
 
 
